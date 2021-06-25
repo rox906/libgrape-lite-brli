@@ -266,6 +266,12 @@ void Run() {
       using AppType = LCC<GraphType>;
       CreateAndQuery<GraphType, AppType>(comm_spec, efile, vfile, out_prefix,
                                          fnum, spec);
+    } else if (name == "smetric") {
+      using GraphType = ImmutableEdgecutFragment<OID_T, VID_T, VDATA_T, EDATA_T,
+                                                 LoadStrategy::kOnlyOut>;
+      using AppType = SMetric<GraphType>;
+      CreateAndQuery<GraphType, AppType>(comm_spec, efile, vfile, out_prefix,
+                                         fnum, spec);
     } else {
       LOG(FATAL) << "No avaiable application named [" << name << "].";
     }

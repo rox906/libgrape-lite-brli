@@ -193,6 +193,7 @@ install(DIRECTORY ${EXAMPLES_DIR}/analytical_apps/bfs
                   ${EXAMPLES_DIR}/analytical_apps/pagerank
                   ${EXAMPLES_DIR}/analytical_apps/sssp
                   ${EXAMPLES_DIR}/analytical_apps/wcc
+                  ${EXAMPLES_DIR}/analytical_apps/smetric
         DESTINATION include/grape/analytical_apps
         FILES_MATCHING
         PATTERN "*.h"
