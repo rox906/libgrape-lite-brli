@@ -51,13 +51,13 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
     ctx.exec_time -= GetCurrentTime();
 #endif
 
-    auto& channel_0 = messages.Channels()[0];
+    auto& channel = messages.Channels();
 
-    for (auto& v : inner_vertices) {  // foreach
+    ForEach(inner_vertices, [&ctx, &frag](int tid, vertex_t v) {
       ctx.deg[v] = frag.GetLocalOutDegree(v);
-    }
+    });
 
-    for (auto& v : inner_vertices) {  // foreach
+    ForEach(inner_vertices, [&ctx, &frag, &channel](int tid, vertex_t v) {
       size_t t = 0;
       auto es = frag.GetOutgoingAdjList(v);
       for (auto& e : es) {
@@ -65,16 +65,16 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
         if (frag.IsInnerVertex(u))
           t += ctx.deg[u];
         else {
-          channel_0.SyncStateOnOuterVertex<fragment_t, size_t>(frag, u,
+          channel[tid].SyncStateOnOuterVertex<fragment_t, size_t>(frag, u,
                                                                ctx.deg[v]);
         }
       }
       ctx.adjDegSum[v] = t;
-    }
+    });
 
-    for (auto& v : inner_vertices) {  // foreach
-      ctx.s_metric += ctx.adjDegSum[v] * ctx.deg[v];
-    }
+    ForEach(inner_vertices, [&ctx, &frag](int tid, vertex_t v) {
+      atomic_add(ctx.s_metric, ctx.adjDegSum[v] * ctx.deg[v]);
+    });
 
 #ifdef PROFILING
     ctx.exec_time += GetCurrentTime();
