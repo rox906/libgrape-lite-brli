@@ -55,6 +55,7 @@ limitations under the License.
 #include "timer.h"
 #include "wcc/wcc.h"
 #include "wcc/wcc_auto.h"
+#include "smetric/smetric.h"
 
 namespace grape {
 

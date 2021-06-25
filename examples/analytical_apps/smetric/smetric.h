@@ -72,10 +72,6 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
       ctx.adjDegSum[v] = t;
     });
 
-    ForEach(inner_vertices, [&ctx, &frag](int tid, vertex_t v) {
-      atomic_add(ctx.s_metric, ctx.adjDegSum[v] * ctx.deg[v]);
-    });
-
 #ifdef PROFILING
     ctx.exec_time += GetCurrentTime();
     ctx.postprocess_time -= GetCurrentTime();
@@ -100,6 +96,11 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
         thrd_num, frag, [&ctx](int tid, vertex_t v, size_t deg) {
           atomic_add(ctx.adjDegSum[v], deg);
         });
+
+    auto inner_vertices = frag.InnerVertices();
+    ForEach(inner_vertices, [&ctx, &frag](int tid, vertex_t v) {
+      atomic_add(ctx.s_metric, ctx.adjDegSum[v] * ctx.deg[v]);
+    });
 
 #ifdef PROFILING
     ctx.preprocess_time += GetCurrentTime();
