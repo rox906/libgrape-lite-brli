@@ -109,9 +109,14 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
           atomic_add(ctx.adjDegSum[v], deg);
         });
 
+    std::vector<size_t> thrd_smetric(thrd_num, 0);
     auto inner_vertices = frag.InnerVertices();
-    for (auto& v : inner_vertices) {
-      ctx.s_metric += ctx.adjDegSum[v] * ctx.deg[v];
+    ForEach(inner_vertices, [&thrd_smetric, &ctx](int tid, vertex_t v) {
+      thrd_smetric[tid] += ctx.adjDegSum[v] * ctx.deg[v];
+    });
+
+    for (int i = 0; i < thrd_num; ++i) {
+      ctx.s_metric += thrd_smetric[i];
     }
 
 #ifdef PROFILING
