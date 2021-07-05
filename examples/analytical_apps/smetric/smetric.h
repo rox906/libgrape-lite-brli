@@ -38,7 +38,7 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
   INSTALL_PARALLEL_WORKER(SMetric<FRAG_T>, SMetricContext<FRAG_T>, FRAG_T)
   using vertex_t = typename fragment_t::vertex_t;
 
-  static constexpr bool need_split_edges = true;
+  // static constexpr bool need_split_edges = true;
 
   void PEval(const fragment_t& frag, context_t& ctx,
              message_manager_t& messages) {
@@ -46,6 +46,7 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
 
     auto inner_vertices = frag.InnerVertices();
     auto outer_vertices = frag.OuterVertices();
+    auto vertices = frag.Vertices();
 
 #ifdef PROFILING
     ctx.exec_time -= GetCurrentTime();
@@ -57,19 +58,30 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
       ctx.deg[v] = frag.GetLocalOutDegree(v);
     });
 
-    ForEach(inner_vertices, [&ctx, &frag, &channel](int tid, vertex_t v) {
+    ForEach(vertices, [&ctx, &frag](int tid, vertex_t v) {
       size_t t = 0;
-      auto es = frag.GetOutgoingAdjList(v);
-      for (auto& e : es) {
-        auto u = e.get_neighbor();
-        if (frag.IsInnerVertex(u))
+      if (frag.IsInnerVertex(v)) {
+        auto es = frag.GetOutgoingAdjList(v);
+        for (auto& e : es) {
+          auto u = e.get_neighbor();
+          if (frag.IsInnerVertex(u))
+            t += ctx.deg[u];
+        }
+      } else {
+        auto es = frag.GetIncomingAdjList(v);
+        for (auto& e : es) {
+          auto u = e.get_neighbor();
           t += ctx.deg[u];
-        else {
-          channel[tid].SyncStateOnOuterVertex<fragment_t, size_t>(frag, u,
-                                                               ctx.deg[v]);
+          if (!frag.IsInnerVertex(u))
+            VLOG(1) << "read local degree of an outer vertex.";
         }
       }
       ctx.adjDegSum[v] = t;
+    });
+
+    ForEach(outer_vertices, [&ctx, &frag, &channel](int tid, vertex_t v) {
+      channel[tid].SyncStateOnOuterVertex<fragment_t, size_t>(frag, v,
+                                                              ctx.adjDegSum[v]);
     });
 
 #ifdef PROFILING
@@ -98,7 +110,7 @@ class SMetric : public ParallelAppBase<FRAG_T, SMetricContext<FRAG_T>>,
         });
 
     auto inner_vertices = frag.InnerVertices();
-    for (auto &v : inner_vertices) {
+    for (auto& v : inner_vertices) {
       ctx.s_metric += ctx.adjDegSum[v] * ctx.deg[v];
     }
 
