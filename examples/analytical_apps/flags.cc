@@ -43,3 +43,5 @@ DEFINE_string(serialization_prefix, "",
               "where to load/store the serialization files");
 
 DEFINE_int32(app_concurrency, -1, "concurrency of application");
+
+DEFINE_bool(no_output, false, "do not print output");

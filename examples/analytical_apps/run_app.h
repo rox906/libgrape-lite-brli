@@ -122,7 +122,8 @@ void CreateAndQuery(const CommSpec& comm_spec, const std::string efile,
   std::string output_path =
       grape::GetResultFilename(out_prefix, fragment->fid());
   ostream.open(output_path);
-  worker->Output(ostream);
+  if (!FLAGS_no_output)
+    worker->Output(ostream);
   ostream.close();
   worker->Finalize();
   timer_end();
