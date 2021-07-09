@@ -125,11 +125,13 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
     // sync messages to other workers
     double rate = 0;
     if (ctx.avg_degree > 10) {
+      VLOG(1) << "degree > 10";
       auto ivnum = frag.GetInnerVerticesNum();
       rate = static_cast<double>(
                  ctx.curr_inner_updated.ParallelCount(thread_num())) /
              static_cast<double>(ivnum);
       if (rate > 0.1) {
+        VLOG(1) << "rate > 0.1";
         auto inner_vertices = frag.InnerVertices();
         auto outer_vertices = frag.OuterVertices();
         ForEach(outer_vertices, [next_depth, &frag, &ctx, &channels](
@@ -160,6 +162,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
           }
         });
       } else {
+        VLOG(1) << "rate < 0.1";
         ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels](
                                             int tid, vertex_t v) {
           auto oes = frag.GetOutgoingAdjList(v);
@@ -178,6 +181,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
         });
       }
     } else {
+      VLOG(1) << "degree < 10";
       ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels](
                                           int tid, vertex_t v) {
         auto oes = frag.GetOutgoingAdjList(v);
