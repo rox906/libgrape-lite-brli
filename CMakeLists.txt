@@ -123,6 +123,11 @@ macro(install_libgrapelite_target target)
     )
 endmacro()
 
+# add vtune instrumentation support---------------------------------------------
+include_directories("/opt/intel/oneapi/vtune/latest/sdk/include/")
+link_directories("/opt/intel/oneapi/vtune/latest/sdk/lib64/")
+link_libraries(ittnotify)
+
 # ------------------------------------------------------------------------------
 # generate libgrape-lite
 # ------------------------------------------------------------------------------

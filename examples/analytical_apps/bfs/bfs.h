@@ -17,6 +17,9 @@ limitations under the License.
 #define EXAMPLES_ANALYTICAL_APPS_BFS_BFS_H_
 
 #include <grape/grape.h>
+#include <ittnotify.h>
+__itt_domain* domain = __itt_domain_create("My Domain");
+__itt_string_handle* handle_inc = __itt_string_handle_create("IncEval");
 
 #include "bfs/bfs_context.h"
 
@@ -97,6 +100,8 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
   void IncEval(const fragment_t& frag, context_t& ctx,
                message_manager_t& messages) {
     using depth_type = typename context_t::depth_type;
+
+    __itt_task_begin(domain, __itt_null, __itt_null, handle_inc);
 
     auto& channels = messages.Channels();
 
@@ -214,6 +219,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
 #ifdef PROFILING
     ctx.postprocess_time += GetCurrentTime();
 #endif
+    __itt_task_end(domain);
   }
 };
 
