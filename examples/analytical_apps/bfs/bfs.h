@@ -66,6 +66,8 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
     auto& channel_0 = messages.Channels()[0];
 
     // run first round BFS, update unreached vertices
+    auto ivnum_ = frag.GetInnerVerticesNum();
+    auto tvnum_ = frag.GetVerticesNum();
     if (native_source) {
       ctx.partial_result[source] = 0;
       auto oes = frag.GetOutgoingAdjList(source);
@@ -73,7 +75,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
         auto u = e.get_neighbor();
         if (ctx.partial_result[u] == std::numeric_limits<depth_type>::max()) {
           ctx.partial_result[u] = 1;
-          if (frag.IsOuterVertex(u)) {
+          if (u.GetValue() >= ivnum_ && u.GetValue() < tvnum_) {
             channel_0.SyncStateOnOuterVertex<fragment_t>(frag, u);
           } else {
             ctx.curr_inner_updated.Insert(u);
@@ -160,7 +162,9 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
           }
         });
       } else {
-        ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels](
+        auto ivnum_ = frag.GetInnerVerticesNum();
+        auto tvnum_ = frag.GetVerticesNum();
+        ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels, ivnum_, tvnum_](
                                             int tid, vertex_t v) {
           auto oes = frag.GetOutgoingAdjList(v);
           for (auto& e : oes) {
@@ -168,7 +172,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
             if (ctx.partial_result[u] ==
                 std::numeric_limits<depth_type>::max()) {
               ctx.partial_result[u] = next_depth;
-              if (frag.IsOuterVertex(u)) {
+              if (u.GetValue() >= ivnum_ && u.GetValue() < tvnum_) {
                 channels[tid].SyncStateOnOuterVertex<fragment_t>(frag, u);
               } else {
                 ctx.next_inner_updated.Insert(u);
@@ -178,14 +182,16 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
         });
       }
     } else {
-      ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels](
+      auto ivnum_ = frag.GetInnerVerticesNum();
+      auto tvnum_ = frag.GetVerticesNum();
+      ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels, ivnum_, tvnum_](
                                           int tid, vertex_t v) {
         auto oes = frag.GetOutgoingAdjList(v);
         for (auto& e : oes) {
           auto u = e.get_neighbor();
           if (ctx.partial_result[u] == std::numeric_limits<depth_type>::max()) {
             ctx.partial_result[u] = next_depth;
-            if (frag.IsOuterVertex(u)) {
+            if (u.GetValue() >= ivnum_ && u.GetValue() < tvnum_) {
               channels[tid].SyncStateOnOuterVertex<fragment_t>(frag, u);
             } else {
               ctx.next_inner_updated.Insert(u);
