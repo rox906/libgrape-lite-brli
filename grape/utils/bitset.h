@@ -21,6 +21,8 @@ limitations under the License.
 #include <algorithm>
 #include <utility>
 
+#include "thread_pool.h"
+
 #define WORD_SIZE(n) (((n) + 63ul) >> 6)
 
 #define WORD_INDEX(i) ((i) >> 6)
@@ -46,9 +48,13 @@ class Bitset {
     if (data_ != NULL) {
       free(data_);
     }
+    delete stp_;
   }
 
   void init(size_t size) {
+    stp_ = new SimpleThreadPool();
+    stp_->thread_num_ = 32;
+    stp_->InitSimpleThreadPool();
     if (data_ != NULL) {
       free(data_);
     }
@@ -65,10 +71,18 @@ class Bitset {
   }
 
   void parallel_clear(int thread_num) {
-#pragma omp parallel for num_threads(thread_num)
-    for (size_t i = 0; i < size_in_words_; ++i) {
-      data_[i] = 0;
+    size_t block = size_in_words_ / 32 + 1;  // ceiling
+    size_t start = 0, end = std::min(block, size_in_words_);
+    for (int i = 0; i < 32; ++i) {
+      stp_->tasks_[i] = [start, end, this]() {
+        for (size_t i = start; i < end; ++i)
+          data_[i] = 0;
+      };
+      start = end;
+      end = std::min(end + block, size_in_words_);
     }
+    stp_->StartAllThreads();
+    stp_->WaitEnd();
   }
 
   bool empty() const {
@@ -148,10 +162,20 @@ class Bitset {
 
   size_t parallel_count(int thread_num) const {
     size_t ret = 0;
-#pragma omp parallel for num_threads(thread_num) reduction(+ : ret)
-    for (size_t i = 0; i < size_in_words_; ++i) {
-      ret += __builtin_popcountll(data_[i]);
+    size_t block = size_in_words_ / 32 + 1;  // ceiling
+    size_t start = 0, end = std::min(block, size_in_words_);
+    for (int tid = 0; tid < 32; ++tid) {
+      stp_->tasks_[tid] = [start, end, this, tid, &ret]() {
+        size_t ret_t = 0;
+        for (size_t i = start; i < end; ++i)
+          ret_t += __builtin_popcountll(data_[i]);
+        __sync_fetch_and_add(&ret, ret_t);
+      };
+      start = end;
+      end = std::min(end + block, size_in_words_);
     }
+    stp_->StartAllThreads();
+    stp_->WaitEnd();
     return ret;
   }
 
@@ -211,6 +235,7 @@ class Bitset {
   uint64_t* data_;
   size_t size_;
   size_t size_in_words_;
+  SimpleThreadPool* stp_;
 };
 
 class RefBitset {
