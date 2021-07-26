@@ -26,9 +26,9 @@ class ThreadPool {
     max_thread_num_ = max_thread_num;
     current_thread_num_ =
         max_thread_num_;  // default use all threads to parallel
-    for (uint32_t i = 0; i < current_thread_num_; ++i) {
+    tasks_.resize(max_thread_num_);
+    for (uint32_t i = 0; i < max_thread_num_; ++i) {
       once_run_.push_back(0);
-      tasks_.push_back(nullptr);
 
       threads_.push_back(std::thread(
           [this](uint32_t tid) {
@@ -42,10 +42,12 @@ class ThreadPool {
                 return;
               }
               m.unlock();
-              (*tasks_[tid])();
+              (tasks_[tid])();
               m.lock();
-              tasks_[tid] = nullptr;
               once_run_[tid] = 0;
+#ifdef DEBUG
+              std::cout << "thread " << tid << " finished a task." << std::endl;
+#endif
               cv.notify_all();
             }
 #ifdef DEBUG
@@ -96,14 +98,14 @@ class ThreadPool {
 
   ~ThreadPool() { Terminate(); }
 
-  void SetTask(uint32_t tid, const std::function<void()>& f) {
-    tasks_[tid] = &f;
+  void SetTask(uint32_t tid, const std::function<void()>&& f) {
+    tasks_[tid] = std::move(f);
   }
 
  private:
   uint32_t max_thread_num_{1};
   uint32_t current_thread_num_{1};
-  std::vector<const std::function<void()>*> tasks_;
+  std::vector<std::function<void()>> tasks_;
   std::mutex m;
   std::condition_variable cv;
   int terminated_{0};
@@ -111,4 +113,4 @@ class ThreadPool {
   std::vector<std::thread> threads_;
 };
 
-#endif // GRAPE_UTILS_THREAD_POOL_H_
+#endif  // GRAPE_UTILS_THREAD_POOL_H_
