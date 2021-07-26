@@ -56,8 +56,8 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
     auto outer_vertices = frag.OuterVertices();
 
     // init double buffer which contains updated vertices using bitmap
-    ctx.curr_inner_updated.Init(inner_vertices, thread_num());
-    ctx.next_inner_updated.Init(inner_vertices, thread_num());
+    ctx.curr_inner_updated.Init(inner_vertices, &GetThreadPool());
+    ctx.next_inner_updated.Init(inner_vertices, &GetThreadPool());
 
 #ifdef PROFILING
     ctx.exec_time -= GetCurrentTime();
@@ -104,7 +104,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
 
     depth_type next_depth = ctx.current_depth + 1;
     int thrd_num = thread_num();
-    ctx.next_inner_updated.ParallelClear(thrd_num);
+    ctx.next_inner_updated.ParallelClear(&GetThreadPool());
 
 #ifdef PROFILING
     ctx.preprocess_time -= GetCurrentTime();
@@ -130,7 +130,7 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
       VLOG(1) << "degree > 10";
       auto ivnum = frag.GetInnerVerticesNum();
       rate = static_cast<double>(
-                 ctx.curr_inner_updated.ParallelCount(thread_num())) /
+                 ctx.curr_inner_updated.ParallelCount(&GetThreadPool())) /
              static_cast<double>(ivnum);
       if (rate > 0.1) {
         VLOG(1) << "rate > 0.1";

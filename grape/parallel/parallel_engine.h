@@ -30,6 +30,7 @@ limitations under the License.
 #include <vector>
 
 #include "grape/communication/sync_comm.h"
+#include "grape/utils/thread_pool.h"
 #include "grape/utils/vertex_set.h"
 #include "grape/worker/comm_spec.h"
 
@@ -89,7 +90,10 @@ class ParallelEngine {
         }
       }
     }
+    thread_pool_.InitThreadPool(thread_num_);
   }
+
+  inline ThreadPool& GetThreadPool() { return thread_pool_; }
 
   /**
    * @brief Iterate a range specified by pointer pair concurrently.
@@ -588,6 +592,7 @@ class ParallelEngine {
   }
 
   bool affinity_;
+  ThreadPool thread_pool_;
   std::vector<uint32_t> cpu_list_;
   uint32_t thread_num_;
 };
