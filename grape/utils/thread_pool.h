@@ -99,6 +99,7 @@ class ThreadPool {
   ~ThreadPool() { Terminate(); }
 
   void SetTask(uint32_t tid, const std::function<void()>&& f) {
+    std::unique_lock<std::mutex> ul(m);
     tasks_[tid] = std::move(f);
   }
 
