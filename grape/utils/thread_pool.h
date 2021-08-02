@@ -20,6 +20,8 @@ limitations under the License.
 
 class ThreadPool {
  public:
+  ThreadPool(ThreadPool const&) = delete;
+  ThreadPool& operator=(ThreadPool const&) = delete;
   ThreadPool() {}
 
   void InitThreadPool(uint32_t max_thread_num) {
@@ -33,22 +35,21 @@ class ThreadPool {
       threads_.push_back(std::thread(
           [this](uint32_t tid) {
             while (1) {
-              std::unique_lock<std::mutex> ul(m);
+              std::unique_lock<std::mutex> ul(mtx_);
 #ifdef DEBUG
               std::cout << "thread " << tid << " before wait." << std::endl;
 #endif
-              cv.wait(ul, [this, &tid]() { return once_run_[tid]; });
-              if (terminated_) {
+              cv_worker_.wait(ul, [this, &tid]() { return once_run_[tid]; });
+              if (terminated_)
                 return;
-              }
-              m.unlock();
+              mtx_.unlock();
               (tasks_[tid])();
-              m.lock();
+              mtx_.lock();
               once_run_[tid] = 0;
 #ifdef DEBUG
               std::cout << "thread " << tid << " finished a task." << std::endl;
 #endif
-              cv.notify_all();
+              cv_worker_.notify_all();
             }
 #ifdef DEBUG
             std::cout << "thread " << tid << " terminated." << std::endl;
@@ -59,18 +60,18 @@ class ThreadPool {
   }
 
   void StartAllThreads() {
-    std::unique_lock<std::mutex> ul(m);
+    std::unique_lock<std::mutex> ul(mtx_);
     for (auto& i : once_run_)
       i = 1;
     ul.unlock();
-    cv.notify_all();
+    cv_worker_.notify_all();
 #ifdef DEBUG
     std::cout << "notify_all" << std::endl;
 #endif
   }
 
   void Terminate() {
-    std::unique_lock<std::mutex> ul(m);
+    std::unique_lock<std::mutex> ul(mtx_);
     terminated_ = 1;
 #ifdef DEBUG
     std::cout << "terminate" << std::endl;
@@ -82,8 +83,8 @@ class ThreadPool {
   }
 
   void WaitEnd() {
-    std::unique_lock<std::mutex> ul(m);
-    cv.wait(ul, [this]() {
+    std::unique_lock<std::mutex> ul(mtx_);
+    cv_worker_.wait(ul, [this]() {
       uint32_t running = 0;
       for (auto i : once_run_)
         running += i;
@@ -99,7 +100,7 @@ class ThreadPool {
   ~ThreadPool() { Terminate(); }
 
   void SetTask(uint32_t tid, const std::function<void()>&& f) {
-    std::unique_lock<std::mutex> ul(m);
+    std::unique_lock<std::mutex> ul(mtx_);
     tasks_[tid] = std::move(f);
   }
 
@@ -107,8 +108,9 @@ class ThreadPool {
   uint32_t max_thread_num_{1};
   uint32_t current_thread_num_{1};
   std::vector<std::function<void()>> tasks_;
-  std::mutex m;
-  std::condition_variable cv;
+  std::mutex mtx_;
+  std::condition_variable cv_worker_;
+  std::condition_variable cv_manager_;
   int terminated_{0};
   std::vector<int> once_run_;
   std::vector<std::thread> threads_;
