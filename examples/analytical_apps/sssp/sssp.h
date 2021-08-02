@@ -130,15 +130,16 @@ class SSSP : public ParallelAppBase<FRAG_T, SSSPContext<FRAG_T>>,
 #endif
 
     // incremental evaluation.
+    auto& partial_result = ctx.partial_result;
     ForEach(ctx.curr_modified, inner_vertices,
-            [&frag, &ctx](int tid, vertex_t v) {
-              double distv = ctx.partial_result[v];
+            [&frag, &ctx, &partial_result](int tid, vertex_t v) {
+              double distv = partial_result[v];
               auto es = frag.GetOutgoingAdjList(v);
               for (auto& e : es) {
                 vertex_t u = e.get_neighbor();
                 double ndistu = distv + e.get_data();
-                if (ndistu < ctx.partial_result[u]) {
-                  atomic_min(ctx.partial_result[u], ndistu);
+                if (ndistu < partial_result[u]) {
+                  atomic_min(partial_result[u], ndistu);
                   ctx.next_modified.Insert(u);
                 }
               }
