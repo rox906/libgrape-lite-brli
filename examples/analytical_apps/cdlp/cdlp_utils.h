@@ -26,18 +26,19 @@ limitations under the License.
 namespace grape {
 template <typename LABEL_T, typename VERTEX_ARRAY_T, typename ADJ_LIST_T>
 inline LABEL_T update_label_fast(const ADJ_LIST_T& edges,
-                                 const VERTEX_ARRAY_T& labels) {
-  std::vector<LABEL_T> local_labels;
+                                 const VERTEX_ARRAY_T& labels,
+                                 LABEL_T* local_labels) {
+  int local_labels_i = 0;
   for (auto& e : edges) {
-    local_labels.emplace_back(labels[e.get_neighbor()]);
+    local_labels[local_labels_i++] = labels[e.get_neighbor()];
   }
-  std::sort(local_labels.begin(), local_labels.end());
+  std::sort(local_labels, local_labels + local_labels_i);
 
   LABEL_T curr_label = local_labels[0];
   int curr_count = 1;
   LABEL_T best_label = 0;
   int best_count = 0;
-  int label_num = local_labels.size();
+  int label_num = local_labels_i;
 
   for (int i = 1; i < label_num; ++i) {
     if (local_labels[i] != local_labels[i - 1]) {

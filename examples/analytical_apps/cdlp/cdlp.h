@@ -64,7 +64,8 @@ class CDLP : public ParallelAppBase<FRAG_T, CDLPContext<FRAG_T>>,
               if (es.Empty()) {
                 ctx.changed[v] = false;
               } else {
-                label_t new_label = update_label_fast<label_t>(es, ctx.labels);
+                label_t new_label = update_label_fast<label_t>(
+                    es, ctx.labels, ctx.local_labelss[tid]);
                 if (ctx.labels[v] != new_label) {
                   new_ilabels[v] = new_label;
                   ctx.changed[v] = true;
@@ -127,6 +128,19 @@ class CDLP : public ParallelAppBase<FRAG_T, CDLPContext<FRAG_T>>,
       ctx.labels[v] = frag.GetOuterVertexId(v);
     });
 #endif
+
+    std::vector<int> now_max_degs(thread_num(), 0);
+    ForEach(inner_vertices, [&frag, &now_max_degs](int tid, vertex_t v) {
+      now_max_degs[tid] =
+          std::max(now_max_degs[tid], frag.GetLocalOutDegree(v));
+    });
+    int now_max_deg = 0;
+
+    for (uint32_t i = 0; i < thread_num(); ++i)
+      now_max_deg = std::max(now_max_degs[i], now_max_deg);
+    ctx.local_labelss = (label_t**) malloc(sizeof(label_t*) * thread_num());
+    for (uint32_t i = 0; i < thread_num(); ++i)
+      ctx.local_labelss[i] = (label_t*) malloc(sizeof(label_t) * now_max_deg);
 
     PropagateLabel(frag, ctx, messages);
   }

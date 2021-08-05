@@ -76,6 +76,8 @@ class CDLPContext : public VertexDataContext<FRAG_T, typename FRAG_T::oid_t> {
 
   int step = 0;
   int max_round = 0;
+  int max_deg = 0;
+  label_t** local_labelss;
 
 #ifdef RANDOM_LABEL
   std::vector<std::mt19937> random_engines;
