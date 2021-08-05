@@ -46,10 +46,11 @@ class ThreadPool {
               (tasks_[tid])();
               mtx_.lock();
               once_run_[tid] = 0;
+              running_--;
 #ifdef DEBUG
               std::cout << "thread " << tid << " finished a task." << std::endl;
 #endif
-              cv_worker_.notify_all();
+              cv_manager_.notify_one();
             }
 #ifdef DEBUG
             std::cout << "thread " << tid << " terminated." << std::endl;
@@ -61,6 +62,7 @@ class ThreadPool {
 
   void StartAllThreads() {
     std::unique_lock<std::mutex> ul(mtx_);
+    running_ = current_thread_num_;
     for (auto& i : once_run_)
       i = 1;
     ul.unlock();
@@ -84,12 +86,7 @@ class ThreadPool {
 
   void WaitEnd() {
     std::unique_lock<std::mutex> ul(mtx_);
-    cv_worker_.wait(ul, [this]() {
-      uint32_t running = 0;
-      for (auto i : once_run_)
-        running += i;
-      return running == 0;
-    });
+    cv_manager_.wait(ul, [this]() { return running_ == 0; });
 #ifdef DEBUG
     std::cout << "all tasks end" << std::endl;
 #endif
@@ -105,6 +102,7 @@ class ThreadPool {
   }
 
  private:
+  uint32_t running_{0};
   uint32_t max_thread_num_{1};
   uint32_t current_thread_num_{1};
   std::vector<std::function<void()>> tasks_;
