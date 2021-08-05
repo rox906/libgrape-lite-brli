@@ -16,102 +16,90 @@ limitations under the License.
 #ifndef GRAPE_UTILS_THREAD_POOL_H_
 #define GRAPE_UTILS_THREAD_POOL_H_
 
-#include <bits/stdc++.h>
+#include <condition_variable>
+#include <functional>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 class ThreadPool {
  public:
-  ThreadPool(ThreadPool const&) = delete;
-  ThreadPool& operator=(ThreadPool const&) = delete;
-  ThreadPool() {}
-
-  void InitThreadPool(uint32_t max_thread_num) {
-    max_thread_num_ = max_thread_num;
-    current_thread_num_ =
-        max_thread_num_;  // default use all threads to parallel
-    tasks_.resize(max_thread_num_);
-    for (uint32_t i = 0; i < max_thread_num_; ++i) {
-      once_run_.push_back(0);
-
-      threads_.push_back(std::thread(
-          [this](uint32_t tid) {
-            while (1) {
-              std::unique_lock<std::mutex> ul(mtx_);
-#ifdef DEBUG
-              std::cout << "thread " << tid << " before wait." << std::endl;
-#endif
-              cv_worker_.wait(ul, [this, &tid]() { return once_run_[tid]; });
-              if (terminated_)
-                return;
-              mtx_.unlock();
-              (tasks_[tid])();
-              mtx_.lock();
-              once_run_[tid] = 0;
-              running_--;
-#ifdef DEBUG
-              std::cout << "thread " << tid << " finished a task." << std::endl;
-#endif
-              cv_manager_.notify_one();
-            }
-#ifdef DEBUG
-            std::cout << "thread " << tid << " terminated." << std::endl;
-#endif
-          },
-          i));
-    }
-  }
-
-  void StartAllThreads() {
-    std::unique_lock<std::mutex> ul(mtx_);
-    running_ = current_thread_num_;
-    for (auto& i : once_run_)
-      i = 1;
-    ul.unlock();
-    cv_worker_.notify_all();
-#ifdef DEBUG
-    std::cout << "notify_all" << std::endl;
-#endif
-  }
-
-  void Terminate() {
-    std::unique_lock<std::mutex> ul(mtx_);
-    terminated_ = 1;
-#ifdef DEBUG
-    std::cout << "terminate" << std::endl;
-#endif
-    ul.unlock();
-    StartAllThreads();
-    for (uint32_t i = 0; i < current_thread_num_; ++i)
-      threads_[i].join();
-  }
-
-  void WaitEnd() {
-    std::unique_lock<std::mutex> ul(mtx_);
-    cv_manager_.wait(ul, [this]() { return running_ == 0; });
-#ifdef DEBUG
-    std::cout << "all tasks end" << std::endl;
-#endif
-  }
-
-  inline uint32_t GetCurrentThreadNum() const { return current_thread_num_; }
-
-  ~ThreadPool() { Terminate(); }
-
-  void SetTask(uint32_t tid, const std::function<void()>&& f) {
-    std::unique_lock<std::mutex> ul(mtx_);
-    tasks_[tid] = std::move(f);
-  }
+  ThreadPool(size_t);
+  template <class F, class... Args>
+  auto enqueue(F&& f, Args&&... args)
+      -> std::future<typename std::result_of<F(Args...)>::type>;
+  ~ThreadPool();
 
  private:
-  uint32_t running_{0};
-  uint32_t max_thread_num_{1};
-  uint32_t current_thread_num_{1};
-  std::vector<std::function<void()>> tasks_;
-  std::mutex mtx_;
-  std::condition_variable cv_worker_;
-  std::condition_variable cv_manager_;
-  int terminated_{0};
-  std::vector<int> once_run_;
-  std::vector<std::thread> threads_;
+  // need to keep track of threads so we can join them
+  std::vector<std::thread> workers;
+  // the task queue
+  std::queue<std::function<void()>> tasks;
+
+  // synchronization
+  std::mutex queue_mutex;
+  std::condition_variable condition;
+  bool stop;
 };
+
+// the constructor just launches some amount of workers
+inline ThreadPool::ThreadPool(size_t threads) : stop(false) {
+  for (size_t i = 0; i < threads; ++i)
+    workers.emplace_back([this] {
+      for (;;) {
+        std::function<void()> task;
+
+        {
+          std::unique_lock<std::mutex> lock(this->queue_mutex);
+          this->condition.wait(
+              lock, [this] { return this->stop || !this->tasks.empty(); });
+          if (this->stop && this->tasks.empty())
+            return;
+          task = std::move(this->tasks.front());
+          this->tasks.pop();
+        }
+
+        task();
+      }
+    });
+}
+
+// add new work item to the pool
+template <class F, class... Args>
+auto ThreadPool::enqueue(F&& f, Args&&... args)
+    -> std::future<typename std::result_of<F(Args...)>::type> {
+  using return_type = typename std::result_of<F(Args...)>::type;
+
+  auto task = std::make_shared<std::packaged_task<return_type()>>(
+      std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+
+  std::future<return_type> res = task->get_future();
+  {
+    std::unique_lock<std::mutex> lock(queue_mutex);
+
+    // don't allow enqueueing after stopping the pool
+    if (stop)
+      throw std::runtime_error("enqueue on stopped ThreadPool");
+
+    tasks.emplace([task]() { (*task)(); });
+  }
+  condition.notify_one();
+  return res;
+}
+
+// the destructor joins all threads
+inline ThreadPool::~ThreadPool() {
+  {
+    std::unique_lock<std::mutex> lock(queue_mutex);
+    stop = true;
+  }
+  condition.notify_all();
+  for (std::thread& worker : workers)
+    worker.join();
+}
 
 #endif  // GRAPE_UTILS_THREAD_POOL_H_
