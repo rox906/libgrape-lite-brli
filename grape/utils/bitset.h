@@ -67,20 +67,20 @@ class Bitset {
   }
 
   void parallel_clear(ThreadPool* thread_pool) {
-    uint32_t thread_num = thread_pool->GetCurrentThreadNum();
+    uint32_t thread_num = thread_pool->GetThreadNum();
     size_t chunk_size =
         std::max(1024ul, (size_in_words_ + thread_num - 1) / thread_num);
     size_t thread_begin = 0, thread_end = std::min(chunk_size, size_in_words_);
+    std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
-      thread_pool->SetTask(tid, [thread_begin, thread_end, this]() {
+      results[tid] = thread_pool->AddTask([thread_begin, thread_end, this]() {
         for (size_t i = thread_begin; i < thread_end; ++i)
           data_[i] = 0;
       });
       thread_begin = thread_end;
       thread_end = std::min(thread_end + chunk_size, size_in_words_);
     }
-    thread_pool->StartAllThreads();
-    thread_pool->WaitEnd();
+    thread_pool->WaitEnd(results);
   }
 
   bool empty() const {
@@ -160,22 +160,23 @@ class Bitset {
 
   size_t parallel_count(ThreadPool* thread_pool) const {
     size_t ret = 0;
-    uint32_t thread_num = thread_pool->GetCurrentThreadNum();
+    uint32_t thread_num = thread_pool->GetThreadNum();
     size_t chunk_size =
         std::max(1024ul, (size_in_words_ + thread_num - 1) / thread_num);
     size_t thread_start = 0, thread_end = std::min(chunk_size, size_in_words_);
+    std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
-      thread_pool->SetTask(tid, [thread_start, thread_end, this, tid, &ret]() {
-        size_t ret_t = 0;
-        for (size_t i = thread_start; i < thread_end; ++i)
-          ret_t += __builtin_popcountll(data_[i]);
-        __sync_fetch_and_add(&ret, ret_t);
-      });
+      results[tid] =
+          thread_pool->AddTask([thread_start, thread_end, this, tid, &ret]() {
+            size_t ret_t = 0;
+            for (size_t i = thread_start; i < thread_end; ++i)
+              ret_t += __builtin_popcountll(data_[i]);
+            __sync_fetch_and_add(&ret, ret_t);
+          });
       thread_start = thread_end;
       thread_end = std::min(thread_end + chunk_size, size_in_words_);
     }
-    thread_pool->StartAllThreads();
-    thread_pool->WaitEnd();
+    thread_pool->WaitEnd(results);
     return ret;
   }
 
@@ -208,23 +209,24 @@ class Bitset {
     size_t cont_end = ROUND_DOWN(end);
     size_t word_beg = WORD_INDEX(cont_beg);
     size_t word_end = WORD_INDEX(cont_end);
-    uint32_t thread_num = thread_pool->GetCurrentThreadNum();
+    uint32_t thread_num = thread_pool->GetThreadNum();
     size_t chunk_size =
         std::max(1024ul, (word_end - word_beg + thread_num - 1) / thread_num);
     size_t thread_begin = word_beg,
            thread_end = std::min(word_beg + chunk_size, word_end);
+    std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
-      thread_pool->SetTask(tid, [thread_begin, thread_end, this, tid, &ret]() {
-        size_t ret_t = 0;
-        for (size_t i = thread_begin; i < thread_end; ++i)
-          ret_t += __builtin_popcountll(data_[i]);
-        __sync_fetch_and_add(&ret, ret_t);
-      });
+      results[tid] =
+          thread_pool->AddTask([thread_begin, thread_end, this, tid, &ret]() {
+            size_t ret_t = 0;
+            for (size_t i = thread_begin; i < thread_end; ++i)
+              ret_t += __builtin_popcountll(data_[i]);
+            __sync_fetch_and_add(&ret, ret_t);
+          });
       thread_begin = thread_end;
       thread_end = std::min(thread_end + chunk_size, word_end);
     }
-    thread_pool->StartAllThreads();
-    thread_pool->WaitEnd();
+    thread_pool->WaitEnd(results);
     if (cont_beg != begin) {
       uint64_t first_word = data_[WORD_INDEX(begin)];
       first_word = (first_word >> (64 - (cont_beg - begin)));

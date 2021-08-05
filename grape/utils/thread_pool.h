@@ -28,10 +28,16 @@ limitations under the License.
 
 class ThreadPool {
  public:
-  ThreadPool(size_t);
+  ThreadPool(ThreadPool const&) = delete;
+  ThreadPool& operator=(ThreadPool const&) = delete;
+  ThreadPool() {}
+  inline void InitThreadPool(size_t);
+
   template <class F, class... Args>
-  auto enqueue(F&& f, Args&&... args)
+  auto AddTask(F&& f, Args&&... args)
       -> std::future<typename std::result_of<F(Args...)>::type>;
+  inline int GetThreadNum() { return thread_num_; }
+  void WaitEnd(std::vector<std::future<void>>& results);
   ~ThreadPool();
 
  private:
@@ -43,11 +49,13 @@ class ThreadPool {
   // synchronization
   std::mutex queue_mutex;
   std::condition_variable condition;
-  bool stop;
+  bool stop{false};
+  size_t thread_num_{1};
 };
 
 // the constructor just launches some amount of workers
-inline ThreadPool::ThreadPool(size_t threads) : stop(false) {
+inline void ThreadPool::InitThreadPool(size_t threads) {
+  thread_num_ = threads;
   for (size_t i = 0; i < threads; ++i)
     workers.emplace_back([this] {
       for (;;) {
@@ -68,9 +76,14 @@ inline ThreadPool::ThreadPool(size_t threads) : stop(false) {
     });
 }
 
-// add new work item to the pool
+inline void ThreadPool::WaitEnd(std::vector<std::future<void>>& results) {
+  for (size_t tid = 0; tid < thread_num_; ++tid)
+    results[tid].get();
+}
+
+// add new task to the pool
 template <class F, class... Args>
-auto ThreadPool::enqueue(F&& f, Args&&... args)
+auto ThreadPool::AddTask(F&& f, Args&&... args)
     -> std::future<typename std::result_of<F(Args...)>::type> {
   using return_type = typename std::result_of<F(Args...)>::type;
 
