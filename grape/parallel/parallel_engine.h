@@ -112,7 +112,7 @@ class ParallelEngine {
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
       results[tid] =
-          thread_pool_.AddTask([chunk_size, &iter_func, begin, end, tid] {
+          thread_pool_.enqueue([chunk_size, &iter_func, begin, end, tid] {
             const T* cur_beg = std::min(begin + tid * chunk_size, end);
             const T* cur_end = std::min(begin + (tid + 1) * chunk_size, end);
             if (cur_beg != cur_end) {
@@ -145,7 +145,7 @@ class ParallelEngine {
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
       results[tid] =
-          thread_pool_.AddTask([&cur, chunk_size, &iter_func, end, tid] {
+          thread_pool_.enqueue([&cur, chunk_size, &iter_func, end, tid] {
             while (true) {
               VID_T cur_beg = std::min(cur.fetch_add(chunk_size), end);
               VID_T cur_end = std::min(cur_beg + chunk_size, end);
@@ -181,7 +181,7 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.AddTask([&cur, chunk_size, &vertices, &iter_func, end, tid] {
+      thread_pool_.enqueue([&cur, chunk_size, &vertices, &iter_func, end, tid] {
         while (true) {
           auto cur_beg = std::min(cur.fetch_add(chunk_size), end);
           auto cur_end = std::min(cur_beg + chunk_size, end);
@@ -227,7 +227,7 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      results[tid] = thread_pool_.AddTask(
+      results[tid] = thread_pool_.enqueue(
           [&cur, chunk_size, &init_func, &iter_func, &finalize_func, end, tid] {
             init_func(tid);
 
@@ -280,7 +280,7 @@ class ParallelEngine {
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
       results[tid] =
-          thread_pool_.AddTask([&cur, chunk_size, &init_func, &vertices,
+          thread_pool_.enqueue([&cur, chunk_size, &init_func, &vertices,
                                 &iter_func, &finalize_func, end, tid] {
             init_func(tid);
 
@@ -324,7 +324,7 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.AddTask([&iter_func, &cur, chunk_size, &bs, beg, end, tid] {
+      thread_pool_.enqueue([&iter_func, &cur, chunk_size, &bs, beg, end, tid] {
         while (true) {
           VID_T cur_beg = std::min(cur.fetch_add(chunk_size), end);
           VID_T cur_end = std::min(cur_beg + chunk_size, end);
@@ -393,7 +393,7 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.AddTask([&iter_func, &cur, chunk_size, &bitset, batch_begin,
+      thread_pool_.enqueue([&iter_func, &cur, chunk_size, &bitset, batch_begin,
                             batch_end, origin_begin, origin_end, complete_begin,
                             this, tid] {
         if (tid == 0 && origin_begin < batch_begin) {
@@ -463,7 +463,7 @@ class ParallelEngine {
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
       results[tid] =
-          thread_pool_.AddTask([&iter_func, &cur, chunk_size, &dense_set,
+          thread_pool_.enqueue([&iter_func, &cur, chunk_size, &dense_set,
                                 &vertices, end, this, tid] {
             while (true) {
               auto cur_beg = std::min(cur.fetch_add(chunk_size), end);
@@ -518,7 +518,7 @@ class ParallelEngine {
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
       results[tid] =
-          thread_pool_.AddTask([&init_func, &finalize_func, &iter_func, &cur,
+          thread_pool_.enqueue([&init_func, &finalize_func, &iter_func, &cur,
                                 chunk_size, &bs, beg, end, tid] {
             init_func(tid);
 

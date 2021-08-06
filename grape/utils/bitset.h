@@ -73,7 +73,7 @@ class Bitset {
     size_t thread_begin = 0, thread_end = std::min(chunk_size, size_in_words_);
     std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
-      results[tid] = thread_pool->AddTask([thread_begin, thread_end, this]() {
+      results[tid] = thread_pool->enqueue([thread_begin, thread_end, this]() {
         for (size_t i = thread_begin; i < thread_end; ++i)
           data_[i] = 0;
       });
@@ -167,7 +167,7 @@ class Bitset {
     std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
       results[tid] =
-          thread_pool->AddTask([thread_start, thread_end, this, tid, &ret]() {
+          thread_pool->enqueue([thread_start, thread_end, this, tid, &ret]() {
             size_t ret_t = 0;
             for (size_t i = thread_start; i < thread_end; ++i)
               ret_t += __builtin_popcountll(data_[i]);
@@ -217,7 +217,7 @@ class Bitset {
     std::vector<std::future<void>> results(thread_num);
     for (uint32_t tid = 0; tid < thread_num; ++tid) {
       results[tid] =
-          thread_pool->AddTask([thread_begin, thread_end, this, tid, &ret]() {
+          thread_pool->enqueue([thread_begin, thread_end, this, tid, &ret]() {
             size_t ret_t = 0;
             for (size_t i = thread_begin; i < thread_end; ++i)
               ret_t += __builtin_popcountll(data_[i]);
