@@ -96,11 +96,11 @@ class LCC : public ParallelAppBase<FRAG_T, LCCContext<FRAG_T>>,
       ForEach(inner_vertices, [&frag, &ctx, &messages](int tid, vertex_t v) {
         vid_t u_gid, v_gid;
         auto& nbr_vec = ctx.complete_neighbor[v];
-        int degree = ctx.global_degree[v];
-        nbr_vec.reserve(degree);
+        // int degree = ctx.global_degree[v];
+        // nbr_vec.reserve(degree);
         auto es = frag.GetOutgoingAdjList(v);
         std::vector<vid_t> msg_vec;
-        msg_vec.reserve(degree);
+        // msg_vec.reserve(degree);
         for (auto& e : es) {
           auto u = e.get_neighbor();
           if (ctx.global_degree[u] < ctx.global_degree[v]) {
