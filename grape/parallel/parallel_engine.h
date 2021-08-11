@@ -402,11 +402,11 @@ class ParallelEngine {
                 ++v;
               }
             }
-        if (tid == (thread_num_ - 1) && batch_end < origin_end) {
-          Vertex<VID_T> v(batch_end);
-          Vertex<VID_T> end(origin_end);
-          while (v != end) {
-            if (bitset.get_bit(v.GetValue())) {
+            if (tid == (thread_num_ - 1) && batch_end < origin_end) {
+              Vertex<VID_T> v(batch_end);
+              Vertex<VID_T> end(origin_end);
+              while (v != end) {
+                if (bitset.get_bit(v.GetValue())) {
                   iter_func(tid, v);
                 }
                 ++v;
