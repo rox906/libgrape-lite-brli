@@ -50,7 +50,6 @@ class SMetricContext : public VertexDataContext<FRAG_T, grape::EmptyType> {
   }
 
   void Output(std::ostream& os) override {
-
     os << s_metric << std::endl;
 
 #ifdef PROFILING

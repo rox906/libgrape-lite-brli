@@ -138,9 +138,11 @@ class CDLP : public ParallelAppBase<FRAG_T, CDLPContext<FRAG_T>>,
 
     for (uint32_t i = 0; i < thread_num(); ++i)
       now_max_deg = std::max(now_max_degs[i], now_max_deg);
-    ctx.local_labelss = (label_t**) malloc(sizeof(label_t*) * thread_num());
+    ctx.local_labelss =
+        reinterpret_cast<label_t**>(malloc(sizeof(label_t*) * thread_num()));
     for (uint32_t i = 0; i < thread_num(); ++i)
-      ctx.local_labelss[i] = (label_t*) malloc(sizeof(label_t) * now_max_deg);
+      ctx.local_labelss[i] =
+          reinterpret_cast<label_t*>(malloc(sizeof(label_t) * now_max_deg));
 
     PropagateLabel(frag, ctx, messages);
   }

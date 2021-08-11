@@ -167,8 +167,8 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
         VLOG(1) << "rate < 0.1";
         auto ivnum_ = frag.GetInnerVerticesNum();
         auto tvnum_ = frag.GetVerticesNum();
-        ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels, ivnum_, tvnum_](
-                                            int tid, vertex_t v) {
+        ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels,
+                                         ivnum_, tvnum_](int tid, vertex_t v) {
           auto oes = frag.GetOutgoingAdjList(v);
           for (auto& e : oes) {
             auto u = e.get_neighbor();
@@ -188,8 +188,8 @@ class BFS : public ParallelAppBase<FRAG_T, BFSContext<FRAG_T>>,
       VLOG(1) << "degree < 10";
       auto ivnum_ = frag.GetInnerVerticesNum();
       auto tvnum_ = frag.GetVerticesNum();
-      ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels, ivnum_, tvnum_](
-                                          int tid, vertex_t v) {
+      ForEach(ctx.curr_inner_updated, [next_depth, &frag, &ctx, &channels,
+                                       ivnum_, tvnum_](int tid, vertex_t v) {
         auto oes = frag.GetOutgoingAdjList(v);
         for (auto& e : oes) {
           auto u = e.get_neighbor();
