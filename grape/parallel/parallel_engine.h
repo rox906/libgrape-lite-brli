@@ -121,7 +121,6 @@ class ParallelEngine {
               }
             }
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
@@ -158,7 +157,6 @@ class ParallelEngine {
               }
             }
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
@@ -181,19 +179,19 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.enqueue([&cur, chunk_size, &vertices, &iter_func, end, tid] {
-        while (true) {
-          auto cur_beg = std::min(cur.fetch_add(chunk_size), end);
-          auto cur_end = std::min(cur_beg + chunk_size, end);
-          if (cur_beg == cur_end) {
-            break;
-          }
-          for (auto idx = cur_beg; idx < cur_end; idx++) {
-            iter_func(tid, vertices[idx]);
-          }
-        }
-      });
-      // setThreadAffinity(threads[i], i);
+      results[tid] = thread_pool_.enqueue(
+          [&cur, chunk_size, &vertices, &iter_func, end, tid] {
+            while (true) {
+              auto cur_beg = std::min(cur.fetch_add(chunk_size), end);
+              auto cur_end = std::min(cur_beg + chunk_size, end);
+              if (cur_beg == cur_end) {
+                break;
+              }
+              for (auto idx = cur_beg; idx < cur_end; idx++) {
+                iter_func(tid, vertices[idx]);
+              }
+            }
+          });
     }
 
     thread_pool_.WaitEnd(results);
@@ -245,7 +243,6 @@ class ParallelEngine {
 
             finalize_func(tid);
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
@@ -297,7 +294,6 @@ class ParallelEngine {
 
             finalize_func(tid);
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
@@ -324,27 +320,27 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.enqueue([&iter_func, &cur, chunk_size, &bs, beg, end, tid] {
-        while (true) {
-          VID_T cur_beg = std::min(cur.fetch_add(chunk_size), end);
-          VID_T cur_end = std::min(cur_beg + chunk_size, end);
-          if (cur_beg == cur_end) {
-            break;
-          }
-          for (VID_T vid = cur_beg; vid < cur_end; vid += 64) {
-            Vertex<VID_T> v(vid);
-            uint64_t word = bs.get_word(vid - beg);
-            while (word != 0) {
-              if (word & 1) {
-                iter_func(tid, v);
+      results[tid] = thread_pool_.enqueue(
+          [&iter_func, &cur, chunk_size, &bs, beg, end, tid] {
+            while (true) {
+              VID_T cur_beg = std::min(cur.fetch_add(chunk_size), end);
+              VID_T cur_end = std::min(cur_beg + chunk_size, end);
+              if (cur_beg == cur_end) {
+                break;
               }
-              ++v;
-              word = word >> 1;
+              for (VID_T vid = cur_beg; vid < cur_end; vid += 64) {
+                Vertex<VID_T> v(vid);
+                uint64_t word = bs.get_word(vid - beg);
+                while (word != 0) {
+                  if (word & 1) {
+                    iter_func(tid, v);
+                  }
+                  ++v;
+                  word = word >> 1;
+                }
+              }
             }
-          }
-        }
-      });
-      // setThreadAffinity(threads[i], i);
+          });
     }
 
     thread_pool_.WaitEnd(results);
@@ -393,51 +389,50 @@ class ParallelEngine {
 
     std::vector<std::future<void>> results(thread_num_);
     for (uint32_t tid = 0; tid < thread_num_; ++tid) {
-      thread_pool_.enqueue([&iter_func, &cur, chunk_size, &bitset, batch_begin,
-                            batch_end, origin_begin, origin_end, complete_begin,
-                            this, tid] {
-        if (tid == 0 && origin_begin < batch_begin) {
-          Vertex<VID_T> v(origin_begin);
-          Vertex<VID_T> end(batch_begin);
-          while (v != end) {
-            if (bitset.get_bit(v.GetValue())) {
-              iter_func(tid, v);
+      results[tid] = thread_pool_.enqueue(
+          [&iter_func, &cur, chunk_size, &bitset, batch_begin, batch_end,
+           origin_begin, origin_end, complete_begin, this, tid] {
+            if (tid == 0 && origin_begin < batch_begin) {
+              Vertex<VID_T> v(origin_begin);
+              Vertex<VID_T> end(batch_begin);
+              while (v != end) {
+                if (bitset.get_bit(v.GetValue())) {
+                  iter_func(tid, v);
+                }
+                ++v;
+              }
             }
-            ++v;
-          }
-        }
         if (tid == (thread_num_ - 1) && batch_end < origin_end) {
           Vertex<VID_T> v(batch_end);
           Vertex<VID_T> end(origin_end);
           while (v != end) {
             if (bitset.get_bit(v.GetValue())) {
-              iter_func(tid, v);
-            }
-            ++v;
-          }
-        }
-        if (batch_begin < batch_end) {
-          while (true) {
-            VID_T cur_beg = std::min(cur.fetch_add(chunk_size), batch_end);
-            VID_T cur_end = std::min(cur_beg + chunk_size, batch_end);
-            if (cur_beg == cur_end) {
-              break;
-            }
-            for (VID_T vid = cur_beg; vid < cur_end; vid += 64) {
-              Vertex<VID_T> v(vid);
-              uint64_t word = bitset.get_word(vid - complete_begin);
-              while (word != 0) {
-                if (word & 1) {
                   iter_func(tid, v);
                 }
                 ++v;
-                word = word >> 1;
               }
             }
-          }
-        }
-      });
-      // setThreadAffinity(threads[i], i);
+            if (batch_begin < batch_end) {
+              while (true) {
+                VID_T cur_beg = std::min(cur.fetch_add(chunk_size), batch_end);
+                VID_T cur_end = std::min(cur_beg + chunk_size, batch_end);
+                if (cur_beg == cur_end) {
+                  break;
+                }
+                for (VID_T vid = cur_beg; vid < cur_end; vid += 64) {
+                  Vertex<VID_T> v(vid);
+                  uint64_t word = bitset.get_word(vid - complete_begin);
+                  while (word != 0) {
+                    if (word & 1) {
+                      iter_func(tid, v);
+                    }
+                    ++v;
+                    word = word >> 1;
+                  }
+                }
+              }
+            }
+          });
     }
 
     thread_pool_.WaitEnd(results);
@@ -479,7 +474,6 @@ class ParallelEngine {
               }
             }
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
@@ -543,7 +537,6 @@ class ParallelEngine {
 
             finalize_func(tid);
           });
-      // setThreadAffinity(threads[i], i);
     }
 
     thread_pool_.WaitEnd(results);
